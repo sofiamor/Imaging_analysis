@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from os import listdir
 from os.path import isfile, join 
-import networkx as nx
 
 
 #this code creates a list with all the files that exist in a folder
@@ -37,20 +36,33 @@ for i in range(len(traces_list)):
 coordinates = np.asarray(coords[0])
 
 data = np.asarray(traces[0]).T
-print('data', data)
 
-plt.figure()
-plt.plot(data[:,0])
-plt.title('Cell 1')
 
+fig, axs = plt.subplots(3, 1, sharey=True)
+axs[0].plot(data[:,2], color='white')
+axs[1].plot(data[:,3], color='darkgrey')
+axs[2].plot(data[:,4], color='grey')
+for ax in axs:
+    ax.tick_params(axis='x', colors='white')
+    ax.tick_params(axis='y', colors='white')
+fig.suptitle('Example cells', color='white')
+
+plt.tight_layout()
+plt.savefig('C:/Users/sofik/Desktop/3cells.png', transparent=True)
 
 plt.figure()
 for i in range(len(data.T)):
     plt.subplot(len(data.T),1,i+1)
     plt.plot(data[:,i],c=(np.random.rand(3)))
+    plt.yticks([])
+
+plt.tick_params(axis='x', colors='white')
+plt.suptitle('All cells', color='white')
+plt.xlabel('Time', color='white')
+plt.savefig('C:/Users/sofik/Desktop/all_cells.png', transparent=True)
 
 corr_values = np.empty( (len(data.T), len(data.T)) )
-
+plt.figure()
 for i in range(len(data.T)):
     for j in range(0,len(data.T)):
         temp = np.corrcoef(data[:,i],data[:,j])
@@ -60,8 +72,12 @@ plt.rcParams['font.family'] = 'Arial'
 plt.rcParams['font.size'] = 12
 plt.figure()
 plt.imshow(corr_values)
-plt.title('Correlation matrix')
+plt.title('Correlation matrix',color='white')
 plt.colorbar()
+plt.tick_params(axis='x', colors='white')
+plt.tick_params(axis='y', colors='white')
+plt.savefig('C:/Users/sofik/Desktop/corr.png', transparent=True)
+
 
 corr_index = np.empty((len(data.T)))
 reordered_data = data[:, np.argsort(corr_index)]
@@ -87,7 +103,10 @@ plt.figure()
 #connection of cell activity, scatter and line 
 for i in range(0,len(data.T)):
     plt.scatter(reordered_coords[i,1],reordered_coords[i,0])
-plt.title('Scatter plot of cells')
+plt.title('Cell positions', color='white')
+plt.tick_params(axis='x', colors='white')
+plt.tick_params(axis='y', colors='white')
+plt.savefig('C:/Users/sofik/Desktop/cellspos.png', transparent=True)
 
 plt.figure()
 
@@ -95,8 +114,11 @@ for i in range(len(data.T)):
     for j in range(len(data.T)):
         #print(reordered_coords[i,:],reordered_data[:,j])
         temp = np.corrcoef(reordered_data[:,i],reordered_data[:,j])
-        plt.plot([reordered_coords[i,0], reordered_coords[j,0]], [reordered_coords[i,1], reordered_coords[j,1]], 'k', linewidth = temp[0,1])
-plt.title('Correlation plot of cells')
+        plt.plot([reordered_coords[i,0], reordered_coords[j,0]], [reordered_coords[i,1], reordered_coords[j,1]], color='white', linewidth = temp[0,1])
+plt.title('Correlation plot of cells', color='white')
+plt.tick_params(axis='x', colors='white')
+plt.tick_params(axis='y', colors='white')
+plt.savefig('C:/Users/sofik/Desktop/correl_line.png', transparent=True)
 
 #graph for all vids
 plt.figure()
@@ -126,6 +148,10 @@ for cell in range(len(traces)):
 plt.title(traces_list[cell])
 ax.axis('off')
 
+import networkx as nx
+import community as community_louvain
+
+
 modularity_values =np.zeros((len(all_correlations)))
 degree_values =np.zeros((len(all_correlations)))
 clustering_values =np.zeros((len(all_correlations)))
@@ -141,7 +167,9 @@ for num in range(0,len(all_correlations)):
 
 
     G = nx.Graph(adjacency_matrix)
-    modularity = nx.community.modularity(G, nx.community.asyn_lpa_communities(G))
+    # Compute the best partition using the Louvain method
+    partition = community_louvain.best_partition(G)
+    modularity = nx.community.modularity(partition, G)
     modularity_values[num] = modularity
 
     degree = np.sum(adjacency_matrix, axis =1)
