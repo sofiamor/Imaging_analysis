@@ -36,3 +36,47 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+import tifffile
+import numpy as np
+
+with tifffile.TiffFile('C:/Users/sofik/Downloads/rgi48_testcode.ome.tif') as tif:
+    data = tif.asarray()
+
+print(f"Loaded data shape: {data.shape}")
+print(f"Number of non-zero frames: {np.sum(np.any(data != 0, axis=(1,2)))}")
+print(f"Number of zero frames: {np.sum(np.all(data == 0, axis=(1,2)))}")
+
+non_zero_frames = np.any(data != 0, axis=(1,2))
+valid_data = data[non_zero_frames]
+print(f"Shape of valid data: {valid_data.shape}")
+import matplotlib.pyplot as plt
+
+plt.figure(figsize=(10,5))
+plt.subplot(121)
+plt.imshow(data[0], cmap='gray')
+plt.title("First Frame")
+plt.subplot(122)
+plt.imshow(data[-1], cmap='gray')
+plt.title("Last Frame")
+plt.show()
+
+def process_tiff(file_path):
+    with tifffile.TiffFile(file_path) as tif:
+        data = tif.asarray()
+    
+    non_zero_frames = np.any(data != 0, axis=(1,2))
+    valid_data = data[non_zero_frames]
+    
+    if valid_data.shape[0] < data.shape[0]:
+        print(f"Warning: {data.shape[0] - valid_data.shape[0]} frames were zero-filled")
+    
+    return valid_data
+
+# Use this function in your analysis
+processed_data = process_tiff('C:/Users/sofik/Downloads/rgi48_testcode.ome.tif')
+
+with tifffile.TiffFile('C:/Users/sofik/Downloads/rgi48_testcode.ome.tif') as tif:
+    ome_metadata = tif.ome_metadata
+print(ome_metadata)
