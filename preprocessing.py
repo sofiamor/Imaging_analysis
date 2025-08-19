@@ -11,7 +11,8 @@ from matplotlib.patches import Ellipse
 import PySimpleGUI as sg
 
 # Load the TIFF file and process
-tiff_path = 'Z:/smorou/Imaging/Voltage_imaging/FORCE/force_day4/FORCE1F_DAY4_SLC2_VID3_75%_2x2/FORCE1F_DAY4_SLC2_VID3_75%_2x2_MMStack.ome.tif'
+#tiff_path = 'Z:/smorou/Imaging/Voltage_imaging/FORCE/force_day4/FORCE1F_DAY4_SLC2_VID3_75%_2x2/FORCE1F_DAY4_SLC2_VID3_75%_2x2_MMStack.ome.tif'
+tiff_path = 'F:/IMAGING/ak3_15_vid3_stim200/ak3_15_vid3_stim200_MMStack.ome.tif'
 base_name = os.path.basename(tiff_path)
 file_name_without_ext = os.path.splitext(base_name)[0]
 print(f"Processing file: {file_name_without_ext}")
@@ -56,6 +57,7 @@ try:
                     max_projection = np.nanmean(np.dstack([max_projection, np.nanmean(chunk_array, axis=0)]), axis=2)
 
                 frame_count += chunk_array.shape[0]
+    
 
     print(f"Processed {frame_count} valid frames out of {num_pages}.")
     print(f"Max projection shape: {max_projection.shape}")
@@ -149,29 +151,43 @@ window.close()
 fluorescence_data = []
 coordinates = []
 
-for (center_y, center_x, width, height) in rois:
-    roi_intensities = []
-    for frame in tiff_stack:
-        Y, X = np.ogrid[:frame.shape[0], :frame.shape[1]]
-        mask = ((X - center_x) ** 2 / (width / 2) ** 2 + (Y - center_y) ** 2 / (height / 2) ** 2) <= 1
-        roi = frame[mask]
-        roi_intensity = np.mean(roi) if roi.size > 0 else np.nan
-        roi_intensities.append(roi_intensity)
+with tiff.TiffFile(tiff_path) as tif:
+    num_pages = len(tif.pages)  # Get the total number of pages (frames)
 
-    fluorescence_data.append(roi_intensities)
-    coordinates.append((center_x, center_y))
+    for (center_y, center_x, width, height) in rois:
+        roi_intensities = []  # Store fluorescence data for this ROI
+        for i in range(num_pages):  # Loop over all frames
+            frame = tif.pages[i].asarray()  # Read the frame
+            Y, X = np.ogrid[:frame.shape[0], :frame.shape[1]]
+            mask = ((X - center_x) ** 2 / (width / 2) ** 2 + (Y - center_y) ** 2 / (height / 2) ** 2) <= 1
+            roi = frame[mask]
+            roi_intensity = np.mean(roi) if roi.size > 0 else np.nan
+            roi_intensities.append(roi_intensity)
+
+        fluorescence_data.append(roi_intensities)
+        coordinates.append((center_x, center_y))
+
+print(len(fluorescence_data))
 
 # Convert the data to a DataFrame
 fluorescence_df = pd.DataFrame(fluorescence_data).T
+print(fluorescence_df.shape)
+print(len(fluorescence_df))
 fluorescence_df.columns = [f'Cell_{i+1}' for i in range(len(rois))]
 fluorescence_df = fluorescence_df.dropna(how='all').dropna(axis=1, how='all')
 fluorescence_df = fluorescence_df.dropna(axis=1, thresh=int(0.9 * len(fluorescence_df)))
 
 # Save the data
-output_path1 = f'Z:/smorou/Analysis/imaging_analysis/VoltageIm/Traces/{file_name_without_ext}_traces.csv'
-output_path2 = f'Z:/smorou/Analysis/imaging_analysis/VoltageIm/Coordinates/{file_name_without_ext}_coords.csv'
-fluorescence_df.to_csv(output_path1, index=False)
-pd.DataFrame(coordinates, columns=['X', 'Y']).to_csv(output_path2, index=False)
+output_path1 = f'F:/histed/Traces/{file_name_without_ext}_traces.csv'
+output_path2 = f'F:/histed/Coordinates/{file_name_without_ext}_coords.csv'
+
+with open(output_path1, 'w') as f:
+    f.write(fluorescence_df.to_csv())
+with open(output_path2, 'w') as f:
+    f.write(pd.DataFrame(coordinates, columns=['X', 'Y']).to_csv())
+
+#fluorescence_df.to_csv(output_path1, index=False)
+#pd.DataFrame(coordinates, columns=['X', 'Y']).to_csv(output_path2, index=False)
 
 print(f"Saved fluorescence data to {output_path1}")
 print(f"Saved coordinates to {output_path2}")
