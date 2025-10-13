@@ -1,48 +1,50 @@
-import sys, os
-# Set your project directory
-project_path = r"C:\Users\sofik\.vscode\Voltage_imaging"
-# Change working directory
-os.chdir(project_path)
-
-# Ensure Python knows where to look for your modules
-if project_path not in sys.path:
-    sys.path.insert(0, project_path)
-
 import numpy as np
-from data_io.config import *
 
-def synchronize(abf_data, abf_time, abf_rate, frame_times, method="resample"):
+def synchronize_flexible(trace_data, trace_time, frame_times, method="interp"):
     """
-    Synchronize imaging frames with ephys trace.
+    Synchronize electrophysiological trace to imaging frames flexibly.
 
     Parameters
     ----------
-    abf_data : np.ndarray
-        Electrophysiology data.
-    abf_time : np.ndarray
-        Time vector for ephys (seconds).
-    abf_rate : float
-        Sampling rate of ABF data (Hz).
-    frame_times : np.ndarray
-        Time stamps of each imaging frame (seconds).
+    trace_data : array-like
+        1D array of ephys values.
+    trace_time : array-like
+        1D array of ephys time points (same length as trace_data).
+    frame_times : array-like
+        1D array of frame timestamps from imaging.
     method : str
-        "resample" = interpolate ABF onto frame times
-        "nearest" = nearest neighbor
+        'interp' (default) uses linear interpolation,
+        'nearest' uses nearest-neighbor matching.
 
     Returns
     -------
-    aligned_abf : np.ndarray
-        ABF signal resampled to imaging frames.
+    aligned_trace : np.ndarray
+        Trace values resampled to frame_times.
+    valid_frame_times : np.ndarray
+        Frame times within the overlapping time window.
     """
-    abf_rate = float(config.EPHYS_SAMPLING_RATE)
-    
-    if method == "resample":
-        aligned_abf = np.interp(frame_times, abf_time, abf_data)
-    elif method == "nearest":
-        idx = np.searchsorted(abf_time, frame_times)
-        idx[idx >= len(abf_data)] = len(abf_data) - 1
-        aligned_abf = abf_data[idx]
-    else:
-        raise ValueError("Unknown sync method.")
 
-    return aligned_abf
+    trace_data = np.ravel(trace_data)
+    trace_time = np.ravel(trace_time)
+    frame_times = np.ravel(frame_times)
+
+    # Ensure overlap between trace and frames
+    t_min = max(trace_time[0], frame_times[0])
+    t_max = min(trace_time[-1], frame_times[-1])
+
+    mask = (frame_times >= t_min) & (frame_times <= t_max)
+    valid_frames = frame_times[mask]
+
+    if len(valid_frames) == 0:
+        raise ValueError("No overlapping time between ephys and imaging data.")
+
+    if method == "interp":
+        aligned_trace = np.interp(valid_frames, trace_time, trace_data)
+    elif method == "nearest":
+        idx = np.searchsorted(trace_time, valid_frames)
+        idx = np.clip(idx, 0, len(trace_time) - 1)
+        aligned_trace = trace_data[idx]
+    else:
+        raise ValueError("Unknown method: choose 'interp' or 'nearest'.")
+
+    return aligned_trace, valid_frames
